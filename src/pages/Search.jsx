@@ -4,6 +4,7 @@ import { ChevronLeft, Clock, Filter, Loader2, Plus, Search as SearchIcon, Shoppi
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import useCartStore from '../store/useCartStore';
+import { FALLBACK_PRODUCTS } from './Home';
 
 const CATEGORIES = ['All', 'Thali', 'Main Course', 'Starter', 'Add-ons'];
 
@@ -19,24 +20,31 @@ const Search = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('name', { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name', { ascending: true });
 
-      if (!error && data) {
-        const cleanItems = data.filter((item) => {
-          if (item.category === 'ARCHIVED') return false;
-          if (['Mutton', 'Signature', 'Chicken', 'Egg', 'Veg'].includes(item.category)) return false;
-          return !String(item.name || '').toLowerCase().includes('mutton');
-        });
-        setItems(cleanItems);
+        if (!error && data && data.length > 0) {
+          const cleanItems = data.filter((item) => {
+            if (item.category === 'ARCHIVED') return false;
+            return true;
+          });
+          setItems(cleanItems);
+        } else {
+          setItems(FALLBACK_PRODUCTS);
+        }
+      } catch (err) {
+        setItems(FALLBACK_PRODUCTS);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchProducts();
   }, []);
+
 
   const results = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();

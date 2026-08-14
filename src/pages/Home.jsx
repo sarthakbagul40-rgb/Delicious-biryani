@@ -6,6 +6,45 @@ import { supabase } from '../lib/supabase';
 import useCartStore from '../store/useCartStore';
 import useAuthStore from '../store/useAuthStore';
 
+export const FALLBACK_PRODUCTS = [
+  // Thalis
+  { id: 'thali-1', name: 'Chicken Biryani Thali', category: 'Thali', price: 220, portion_size: 'Full Thali', description: 'Authentic Hyderabadi chicken biryani served with chicken gravy, raita, and dessert.', image_url: '/assets/thalis/chicken_biryani_thali.jpg', is_in_stock: true, is_special: true },
+  { id: 'thali-2', name: 'Chicken Masala Thali', category: 'Thali', price: 200, portion_size: 'Full Thali', description: 'Spicy chicken masala curry served with 2 bhakris, plain rice, and salad.', image_url: '/assets/thalis/chicken_masala_thali.jpg', is_in_stock: true },
+  { id: 'thali-3', name: 'Eggs Masala Thali', category: 'Thali', price: 150, portion_size: 'Full Thali', description: 'Boiled egg masala curry served with bhakris, rice, and raita.', image_url: '/assets/thalis/eggs_masala_thali.jpg', is_in_stock: true },
+  { id: 'thali-4', name: 'Fish Thali', category: 'Thali', price: 240, portion_size: 'Full Thali', description: 'Fresh pan-fried fish served with spicy Malvani fish curry, rice, and bhakri.', image_url: '/assets/thalis/fish_thali.jpg', is_in_stock: true },
+  { id: 'thali-5', name: 'Veg Thali', category: 'Thali', price: 160, portion_size: 'Full Thali', description: 'Paneer gravy, veg fry, dal, rice, 2 chapatis, and sweet.', image_url: '/assets/thalis/veg_thali.jpg', is_in_stock: true },
+
+  // Main Course
+  { id: 'mc-1', name: 'Chicken Biryani (Full)', category: 'Main Course', price: 240, portion_size: '750gm', description: 'Aromatic long-grain Basmati rice layered with juicy marinated chicken pieces cooked on slow Dum.', image_url: '/assets/main_course/chicken_biryani_full.png', is_in_stock: true, is_special: true },
+  { id: 'mc-2', name: 'Chicken Biryani (Half)', category: 'Main Course', price: 140, portion_size: '450gm', description: 'Half portion of fragrant slow-cooked Dum biryani with tender chicken pieces.', image_url: '/assets/main_course/chicken_biryani_half.png', is_in_stock: true },
+  { id: 'mc-3', name: 'Chicken Curry', category: 'Main Course', price: 180, portion_size: '500ml', description: 'Traditional homestyle chicken curry cooked with roasted whole spices.', image_url: '/assets/main_course/chicken_curry.png', is_in_stock: true },
+  { id: 'mc-4', name: 'Chicken Kheema', category: 'Main Course', price: 190, portion_size: '400gm', description: 'Minced chicken cooked with green peas, onions, tomatoes, and aromatic spices.', image_url: '/assets/main_course/chicken_kheema.png', is_in_stock: true },
+  { id: 'mc-5', name: 'Egg Curry', category: 'Main Course', price: 140, portion_size: '500ml', description: 'Hard-boiled eggs simmered in a rich tomato and onion spiced gravy.', image_url: '/assets/main_course/egg_curry.png', is_in_stock: true },
+  { id: 'mc-6', name: 'Green Chicken Gravy', category: 'Main Course', price: 190, portion_size: '500ml', description: 'Tender chicken cooked in a lush mint, coriander, and spinach green masala.', image_url: '/assets/main_course/green_chicken_gravy.png', is_in_stock: true },
+  { id: 'mc-7', name: 'Kharda Chicken', category: 'Main Course', price: 200, portion_size: '450gm', description: 'Fiery Kolhapuri green chili crushed Kharda chicken fry with robust flavors.', image_url: '/assets/main_course/kharda_chicken.png', is_in_stock: true },
+
+  // Starters
+  { id: 'st-1', name: 'Chicken Tandoori', category: 'Starter', price: 220, portion_size: 'Half Bird', description: 'Charcoal roasted tandoori chicken marinated in yogurt and Kashmiri spices.', image_url: '/assets/starters/chicken_tandoori.png', is_in_stock: true, is_special: true },
+  { id: 'st-2', name: 'Chicken Fry', category: 'Starter', price: 170, portion_size: '250gm', description: 'Crispy deep-fried spicy chicken bites tossed with curry leaves.', image_url: '/assets/starters/chicken_fry.png', is_in_stock: true },
+  { id: 'st-3', name: 'Chicken Tawa Fry', category: 'Starter', price: 180, portion_size: '300gm', description: 'Pan-seared marinated chicken cooked on iron tawa with crushed garlic and spices.', image_url: '/assets/starters/chicken_tawa_fry.png', is_in_stock: true },
+  { id: 'st-4', name: 'Fish Fry', category: 'Starter', price: 200, portion_size: '2 Pcs', description: 'Crispy rava-coated fried fish fillets marinated in spicy Konkani masala.', image_url: '/assets/starters/fish_fry.png', is_in_stock: true },
+  { id: 'st-5', name: 'Boil Eggs', category: 'Starter', price: 40, portion_size: '2 Pcs', description: 'Freshly boiled eggs sprinkled with chat masala and black pepper.', image_url: '/assets/starters/boil_eggs.png', is_in_stock: true },
+  { id: 'st-6', name: 'Double Omelette', category: 'Starter', price: 60, portion_size: '2 Eggs', description: 'Fluffy double egg omelette cooked with chopped onions, green chilies, and herbs.', image_url: '/assets/starters/double_omelette.png', is_in_stock: true },
+  { id: 'st-7', name: 'Single Omelette', category: 'Starter', price: 35, portion_size: '1 Egg', description: 'Single egg street-style omelette with onion and spice seasoning.', image_url: '/assets/starters/single_omelette.png', is_in_stock: true },
+  { id: 'st-8', name: 'Eggs Maggie', category: 'Starter', price: 70, portion_size: '1 Bowl', description: 'Hot spicy Maggi noodles cooked with scrambled egg and veggies.', image_url: '/assets/starters/eggs_maggie.png', is_in_stock: true },
+  { id: 'st-9', name: 'Plain Maggie', category: 'Starter', price: 50, portion_size: '1 Bowl', description: 'Classic 2-minute masala Maggi noodles served piping hot.', image_url: '/assets/starters/plain_maggie.png', is_in_stock: true },
+  { id: 'st-10', name: 'Veg Maggie', category: 'Starter', price: 60, portion_size: '1 Bowl', description: 'Maggi noodles loaded with sweet corn, capsicum, and green peas.', image_url: '/assets/starters/veg_maggie.png', is_in_stock: true },
+  { id: 'st-11', name: 'Mirchi Pakoda', category: 'Starter', price: 50, portion_size: '4 Pcs', description: 'Crispy gram flour fritters made with mild green chilies.', image_url: '/assets/starters/mirchi_pakoda.png', is_in_stock: true },
+
+  // Add-ons
+  { id: 'ad-1', name: 'Chapati', category: 'Add-ons', price: 15, portion_size: '1 Pc', description: 'Soft wheat flour chapati made fresh to order.', image_url: '/assets/addons/chapati.jpg', is_in_stock: true },
+  { id: 'ad-2', name: 'Bhajri Bhakri', category: 'Add-ons', price: 25, portion_size: '1 Pc', description: 'Traditional rural pearl millet flatbread baked on iron tawa.', image_url: '/assets/addons/bhajri_bhakri.jpg', is_in_stock: true },
+  { id: 'ad-3', name: 'Jowri Bhakri', category: 'Add-ons', price: 25, portion_size: '1 Pc', description: 'Healthy sorghum flatbread cooked on open flame.', image_url: '/assets/addons/jowri_bhakri.jpg', is_in_stock: true },
+  { id: 'ad-4', name: 'Nachni Bhakri', category: 'Add-ons', price: 30, portion_size: '1 Pc', description: 'Nutritious finger millet (ragi) bhakri rich in fiber and minerals.', image_url: '/assets/addons/nachni_bhakri.jpg', is_in_stock: true },
+  { id: 'ad-5', name: 'Rice Bhakri', category: 'Add-ons', price: 25, portion_size: '1 Pc', description: 'Soft and thin rice flour flatbread, perfect with curries.', image_url: '/assets/addons/rice_bhakri.jpg', is_in_stock: true },
+  { id: 'ad-6', name: 'Plain Rice', category: 'Add-ons', price: 60, portion_size: '1 Bowl', description: 'Steamed long-grain Basmati rice.', image_url: '/assets/addons/plain_rice.jpg', is_in_stock: true }
+];
+
 const CATEGORIES = ['All', 'Thali', 'Main Course', 'Starter', 'Add-ons'];
 
 const Home = () => {
@@ -20,54 +59,49 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [moodResult, setMoodResult] = useState(null);
-  const [isCruncing, setIsCrunching] = useState(false);
+  const [isCrunching, setIsCrunching] = useState(false);
 
   useEffect(() => {
     fetchMenu();
-
-
-
-
   }, []);
 
   const fetchMenu = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false }); // Latest first
-    
-    if (data && !error) {
-      // Deduplicate by name, preferring local assets for thalis
-      const uniqueItems = data.reduce((acc, current) => {
-        const x = acc.find(item => item.name === current.name);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          // If duplicate, prefer the one with the local image path
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false }); // Latest first
+      
+      if (data && data.length > 0 && !error) {
+        const uniqueItems = data.reduce((acc, current) => {
+          const x = acc.find(item => item.name === current.name);
+          if (!x) return acc.concat([current]);
           if (current.image_url.startsWith('/assets/') && !x.image_url.startsWith('/assets/')) {
             const index = acc.indexOf(x);
             acc[index] = current;
           }
           return acc;
-        }
-      }, []);
-      setMenuItems(uniqueItems.filter(item => item.category !== 'ARCHIVED'));
+        }, []);
+        setMenuItems(uniqueItems.filter(item => item.category !== 'ARCHIVED'));
+      } else {
+        setMenuItems(FALLBACK_PRODUCTS);
+      }
+    } catch (err) {
+      setMenuItems(FALLBACK_PRODUCTS);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const filteredItems = menuItems.filter(item => {
-    // 1. HARD CATEGORY BLOCK (Mutton, Signature, Chicken, Egg, Veg)
-    if (['Mutton', 'Signature', 'Chicken', 'Egg', 'Veg'].includes(item.category)) return false;
-    if (item.name.toLowerCase().includes('mutton')) return false;
 
-    // 2. SEARCH & CATEGORY FILTER
+  const filteredItems = menuItems.filter(item => {
     const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     
     return matchesCategory && matchesSearch;
   });
+
 
   const handleMoodSelect = (mood) => {
     setIsCrunching(true);
@@ -307,7 +341,7 @@ const Home = () => {
                 <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase mb-2 italic">Mood Magic</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-8">What are you craving today?</p>
 
-                {!moodResult && !isCruncing ? (
+                {!moodResult && !isCrunching ? (
                   <div className="grid grid-cols-2 gap-4">
                     {[
                       { id: 'spicy', label: 'Spicy & Bold', sub: 'Chicken Fire', icon: <Flame size={18} /> },
@@ -326,7 +360,7 @@ const Home = () => {
                       </button>
                     ))}
                   </div>
-                ) : isCruncing ? (
+                ) : isCrunching ? (
                   <div className="py-12 space-y-4">
                     <Loader2 size={40} className="animate-spin text-primary mx-auto" />
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse italic">Scanning flavors...</p>

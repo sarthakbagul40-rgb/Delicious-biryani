@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, Clock, Flame, ShoppingCart, Plus, Minus, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useCartStore from '../store/useCartStore';
-import { supabase } from '../lib/supabase';
+import { FALLBACK_PRODUCTS } from './Home';
 
 const Details = () => {
   const { id } = useParams();
@@ -21,19 +21,33 @@ const Details = () => {
 
   const fetchProduct = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (data) {
-      setProduct(data);
-      const isSizeProduct = data.portion_size === '450gm' || data.portion_size === '750gm';
-      setSelectedSize(isSizeProduct ? '750gm' : (data.portion_size || '750gm'));
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (data && !error) {
+        setProduct(data);
+        const isSizeProduct = data.portion_size === '450gm' || data.portion_size === '750gm';
+        setSelectedSize(isSizeProduct ? '750gm' : (data.portion_size || '750gm'));
+      } else {
+        const localMatch = FALLBACK_PRODUCTS.find(p => p.id === id || p.name.toLowerCase().includes(id.toLowerCase()));
+        if (localMatch) {
+          setProduct(localMatch);
+          const isSizeProduct = localMatch.portion_size === '450gm' || localMatch.portion_size === '750gm';
+          setSelectedSize(isSizeProduct ? '750gm' : (localMatch.portion_size || '750gm'));
+        }
+      }
+    } catch (err) {
+      const localMatch = FALLBACK_PRODUCTS.find(p => p.id === id || p.name.toLowerCase().includes(id.toLowerCase()));
+      if (localMatch) setProduct(localMatch);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">

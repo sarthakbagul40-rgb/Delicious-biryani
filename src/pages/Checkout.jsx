@@ -8,8 +8,8 @@ import useAddressStore from '../store/useAddressStore';
 import { supabase } from '../lib/supabase';
 import AddAddressModal from '../components/AddAddressModal';
 
-const ADMIN_WHATSAPP_NUMBER = import.meta.env.VITE_ADMIN_WHATSAPP || "919769793452";
-const UPI_ID = import.meta.env.VITE_UPI_ID || "bagulk213-1@oksbi";
+const ADMIN_WHATSAPP_NUMBER = import.meta.env.VITE_ADMIN_WHATSAPP || "";
+const UPI_ID = import.meta.env.VITE_UPI_ID || "";
 const UPI_NAME = import.meta.env.VITE_UPI_NAME || "Delicious Biryani";
 
 const Checkout = () => {
