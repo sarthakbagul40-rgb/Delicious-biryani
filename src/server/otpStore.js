@@ -8,8 +8,8 @@ import crypto from 'crypto';
 // Key: normalized email -> Value: { otp, expiresAt, attempts, verified, createdAt }
 const otpStore = new Map();
 
-// Automatic garbage collection every 2 minutes
-setInterval(() => {
+// Automatic garbage collection every 2 minutes (unref prevents blocking process exit)
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [email, record] of otpStore.entries()) {
     if (record.expiresAt < now) {
@@ -17,6 +17,7 @@ setInterval(() => {
     }
   }
 }, 2 * 60 * 1000);
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 /**
  * Generate and store a secure 6-digit OTP code for an email.

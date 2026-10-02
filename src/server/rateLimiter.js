@@ -12,8 +12,8 @@ const RULES = {
   GLOBAL_API: { maxRequests: 60, windowSeconds: 60 }    // 60 requests per minute
 };
 
-// Cleanup stale rate limit records every 5 minutes
-setInterval(() => {
+// Cleanup stale rate limit records every 5 minutes (unref prevents blocking process exit)
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of limits.entries()) {
     if (record.resetAt < now) {
@@ -21,6 +21,7 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 /**
  * Check and record a rate limit attempt.
