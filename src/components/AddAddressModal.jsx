@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Home, Briefcase, Plus, Loader2, Navigation, CheckCircle2, AlertCircle, Map as MapIcon, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polygon, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import useAddressStore from '../store/useAddressStore';
 import useAuthStore from '../store/useAuthStore';
+import { 
+  DELIVERY_ZONE_POLYGON, 
+  isPointInServiceZone, 
+  ZONE_CENTER, 
+  SERVICEABLE_SECTORS 
+} from '../lib/deliveryZone';
 
 // Fix for default marker icons in Leaflet + Vite
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -45,16 +51,22 @@ const AddAddressModal = ({ isOpen, onClose }) => {
   const [label, setLabel] = useState('Home');
   const [roomWing, setRoomWing] = useState('');
   const [buildingName, setBuildingName] = useState('');
-  const [locality, setLocality] = useState('Lakeshore');
-  const [coords, setCoords] = useState({ lat: 19.168, lng: 73.076 }); // Default to Palava
+  const [locality, setLocality] = useState('Crown Taloja');
+  const [coords, setCoords] = useState({ lat: ZONE_CENTER.lat, lng: ZONE_CENTER.lng });
   const [step, setStep] = useState('form'); // 'form', 'map-confirm', 'verifying', 'success'
   const [result, setResult] = useState(null);
 
-  const LOCALITIES = ['Lakeshore', 'Downtown', 'Lodha Crown'];
+  const LOCALITIES = SERVICEABLE_SECTORS;
 
   const handleInitialVerify = async () => {
     const fullAddress = `${roomWing}, ${buildingName}, ${locality}`;
-    if (!roomWing.trim() || !buildingName.trim()) return;
+    if (!roomWing.trim() || !buildingName.trim()) {
+      setResult({
+        success: false,
+        error: "Please enter your Flat/Room number and Building/Tower name."
+      });
+      return;
+    }
     
     setStep('verifying');
     // We search first to get approximate coords
@@ -71,8 +83,8 @@ const AddAddressModal = ({ isOpen, onClose }) => {
         setCoords({ lat: parseFloat(geoData[0].lat), lng: parseFloat(geoData[0].lon) });
         setStep('map-confirm');
       } else {
-        // Fallback to a default spot in Palava if search fails, let user fix it on map
-        setCoords({ lat: 19.168, lng: 73.076 });
+        // Fallback to center of delivery zone if search fails, let user fix it on map
+        setCoords({ lat: ZONE_CENTER.lat, lng: ZONE_CENTER.lng });
         setStep('map-confirm');
       }
     } catch (err) {
@@ -84,7 +96,8 @@ const AddAddressModal = ({ isOpen, onClose }) => {
   const handleConfirmLocation = async () => {
     setStep('verifying');
     const fullAddress = `${roomWing}, ${buildingName}, ${locality}`;
-    const res = await addAddress(user.id, {
+    const userId = user?.uid || user?.id;
+    const res = await addAddress(userId, {
       label,
       address_line: fullAddress,
       lat: coords.lat,
@@ -104,18 +117,29 @@ const AddAddressModal = ({ isOpen, onClose }) => {
   };
 
   const handleDetectLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      setStep('map-confirm');
-    });
+    if (!navigator.geolocation) {
+      setResult({ success: false, error: "Geolocation is not supported by your browser." });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setStep('map-confirm');
+      },
+      (err) => {
+        console.warn('Geolocation error/denied:', err);
+        setResult({ success: false, error: "Location permission denied. Please select your complex manually." });
+      },
+      { timeout: 8000 }
+    );
   };
 
   const resetState = () => {
     setStep('form');
     setRoomWing('');
     setBuildingName('');
-    setLocality('Lakeshore');
+    setLocality('Crown Taloja');
+    setCoords({ lat: ZONE_CENTER.lat, lng: ZONE_CENTER.lng });
     setResult(null);
   };
 
@@ -239,63 +263,131 @@ const AddAddressModal = ({ isOpen, onClose }) => {
 
                 <button 
                   onClick={handleInitialVerify}
-                  disabled={!roomWing.trim() || !buildingName.trim() || isLoading}
-                  className="w-full bg-primary text-white p-5 rounded-twelve font-black uppercase tracking-widest text-sm shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                  disabled={isLoading}
+                  className="w-full bg-primary text-white p-5 rounded-twelve font-black uppercase tracking-widest text-sm shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center gap-3 active:scale-98"
                 >
                   Next Step: Review Map <ChevronRight size={18} />
                 </button>
+
               </motion.div>
             )}
 
-            {step === 'map-confirm' && (
-              <motion.div 
-                key="map"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col h-full min-h-[400px]"
-              >
-                <div className="h-[300px] w-full relative">
-                  <MapContainer center={[coords.lat, coords.lng]} zoom={16} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <ChangeView center={[coords.lat, coords.lng]} />
-                    <Marker position={[coords.lat, coords.lng]} draggable={true} 
-                            eventHandlers={{ dragend: (e) => setCoords({ lat: e.target.getLatLng().lat, lng: e.target.getLatLng().lng }) }} />
-                    <MapClickHandler onLocationChange={(lat, lng) => setCoords({ lat, lng })} />
-                  </MapContainer>
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-slate-100">
-                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-2 whitespace-nowrap">
-                       <MapIcon size={12} className="text-primary" /> Drag the Pin to your exact location
-                     </p>
-                  </div>
-                </div>
-                
-                <div className="p-8">
-                  <div className="bg-slate-50 p-4 rounded-twelve border border-slate-100 mb-8 flex gap-3 items-center">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm">
-                       <MapPin size={20} />
+            {step === 'map-confirm' && (() => {
+              const isCurrentPointInside = isPointInServiceZone(coords.lat, coords.lng);
+              return (
+                <motion.div 
+                  key="map"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col h-full min-h-[400px]"
+                >
+                  <div className="h-[300px] w-full relative">
+                    <MapContainer center={[coords.lat, coords.lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <ChangeView center={[coords.lat, coords.lng]} />
+                      
+                      {/* Exact Delivery Polygon Matching Google Maps Specification */}
+                      <Polygon 
+                        positions={DELIVERY_ZONE_POLYGON} 
+                        pathOptions={{ 
+                          color: '#ec6d13', 
+                          weight: 3, 
+                          fillColor: '#10b981', 
+                          fillOpacity: 0.22, 
+                          dashArray: '6, 6' 
+                        }} 
+                      />
+                      
+                      <Marker 
+                        position={[coords.lat, coords.lng]} 
+                        draggable={true} 
+                        eventHandlers={{ 
+                          dragend: (e) => setCoords({ lat: e.target.getLatLng().lat, lng: e.target.getLatLng().lng }) 
+                        }} 
+                      />
+                      <MapClickHandler onLocationChange={(lat, lng) => setCoords({ lat, lng })} />
+                    </MapContainer>
+
+                    {/* Floating Real-Time Delivery Zone Indicator */}
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] w-[92%] max-w-sm pointer-events-none">
+                      {isCurrentPointInside ? (
+                        <div className="bg-emerald-600/95 backdrop-blur-md text-white px-3.5 py-2 rounded-2xl shadow-xl border border-emerald-400/40 flex items-center justify-between text-xs font-bold transition-all">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 size={16} className="text-emerald-200" />
+                            <span>Inside Delivery Zone!</span>
+                          </span>
+                          <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Serviceable</span>
+                        </div>
+                      ) : (
+                        <div className="bg-rose-600/95 backdrop-blur-md text-white px-3.5 py-2 rounded-2xl shadow-xl border border-rose-400/40 flex items-center justify-between text-xs font-bold transition-all animate-pulse">
+                          <span className="flex items-center gap-1.5">
+                            <AlertCircle size={16} className="text-rose-200" />
+                            <span>Outside Delivery Boundary</span>
+                          </span>
+                          <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Move Pin</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase leading-relaxed">
-                      Coordinates captured: <span className="text-slate-800 font-black">{coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}</span>
-                    </p>
+
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur-sm px-3.5 py-1.5 rounded-full shadow-md border border-slate-200 pointer-events-none">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+                        <MapIcon size={12} className="text-[#ec6d13]" /> Drag pin to your exact building
+                      </p>
+                    </div>
                   </div>
                   
-                  <div className="flex gap-4">
-                    <button 
-                      onClick={() => setStep('form')}
-                      className="flex-1 py-4 px-6 rounded-twelve border-2 border-slate-100 text-slate-400 font-black uppercase tracking-widest text-xs"
-                    >
-                      Back
-                    </button>
-                    <button 
-                      onClick={handleConfirmLocation}
-                      className="flex-[2] bg-primary text-white p-4 rounded-twelve font-black uppercase tracking-widest text-sm shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all"
-                    >
-                      Confirm & Save
-                    </button>
+                  <div className="p-6 sm:p-8">
+                    {/* Status Info Box */}
+                    <div className={`p-4 rounded-2xl border mb-6 flex gap-3.5 items-center transition-all ${
+                      isCurrentPointInside 
+                        ? 'bg-emerald-50/80 border-emerald-200/90 text-emerald-900' 
+                        : 'bg-rose-50/80 border-rose-200/90 text-rose-900'
+                    }`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${
+                        isCurrentPointInside ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                      }`}>
+                        <MapPin size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider">
+                            {isCurrentPointInside ? '✓ Inside Delivery Polygon' : '⚠️ Outside Delivery Boundary'}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold opacity-75">
+                            {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold mt-0.5 leading-tight opacity-90">
+                          {isCurrentPointInside 
+                            ? 'Green zone confirmed. Hot dum biryani will be delivered fresh to this location!' 
+                            : 'Please drag the pin inside the green shaded polygon to qualify for delivery.'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => setStep('form')}
+                        className="flex-1 py-3.5 px-6 rounded-2xl border-2 border-slate-100 text-slate-500 hover:text-slate-800 font-black uppercase tracking-widest text-xs transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={handleConfirmLocation}
+                        className={`flex-[2] py-3.5 px-6 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all flex items-center justify-center gap-2 ${
+                          isCurrentPointInside 
+                            ? 'bg-gradient-to-r from-[#ec6d13] to-[#f4c430] text-slate-950 shadow-primary/25 hover:scale-[1.01] active:scale-[0.99] saffron-glow' 
+                            : 'bg-slate-800 text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>{isCurrentPointInside ? 'Confirm & Save Address' : 'Save Address (Outside Zone)'}</span>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            )}
+                </motion.div>
+              );
+            })()}
 
             {step === 'verifying' && (
               <div className="py-20 flex flex-col items-center justify-center text-center">

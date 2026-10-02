@@ -1,71 +1,236 @@
-import { CheckCircle2, ChefHat, Clock, PackageCheck, Truck, XCircle } from 'lucide-react';
+import { CheckCircle2, ChefHat, Clock, PackageCheck, Truck, XCircle, Flame, Check } from 'lucide-react';
 
 export const ORDER_STATUS = {
-  pending: {
-    label: 'Placed',
-    progress: 12,
-    tone: 'bg-amber-50 text-amber-700 border-amber-100',
-    title: 'Order received',
-    detail: 'We have received your order and will confirm it shortly.',
-    icon: Clock,
-  },
   placed: {
-    label: 'Placed',
-    progress: 12,
-    tone: 'bg-amber-50 text-amber-700 border-amber-100',
-    title: 'Order received',
-    detail: 'We have received your order and will confirm it shortly.',
+    key: 'placed',
+    label: 'Order Confirmed',
+    progress: 25,
+    tone: 'bg-amber-50 text-amber-800 border-amber-200/80',
+    dotColor: 'bg-amber-500',
+    title: 'Order Confirmed & Queued',
+    detail: 'Your order is recorded in the kitchen ledger. Dum preparation starting.',
+    stepNumber: 1,
     icon: Clock,
-  },
-  accepted: {
-    label: 'Accepted',
-    progress: 28,
-    tone: 'bg-blue-50 text-blue-700 border-blue-100',
-    title: 'Kitchen accepted',
-    detail: 'Your order is confirmed and queued in the kitchen.',
-    icon: CheckCircle2,
   },
   preparing: {
-    label: 'Preparing',
-    progress: 58,
-    tone: 'bg-orange-50 text-orange-700 border-orange-100',
-    title: 'Freshly preparing',
-    detail: 'The biryani is being prepared with fresh ingredients.',
+    key: 'preparing',
+    label: 'Dum Cooking',
+    progress: 60,
+    tone: 'bg-orange-50 text-[#ec6d13] border-orange-200/80',
+    dotColor: 'bg-orange-500',
+    title: 'Handi Sealed & Dum Steaming',
+    detail: 'Authentic slow dum cooking with natural whole spices in clay handi.',
+    stepNumber: 2,
     icon: ChefHat,
   },
   out_for_delivery: {
-    label: 'Out for delivery',
-    progress: 84,
-    tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-    title: 'Out for delivery',
-    detail: 'Your order has left the kitchen and is on the way.',
+    key: 'out_for_delivery',
+    label: 'Out for Delivery',
+    progress: 85,
+    tone: 'bg-blue-50 text-blue-800 border-blue-200/80',
+    dotColor: 'bg-blue-500',
+    title: 'Rider Out for Delivery',
+    detail: 'Hot insulated bag on the way to your complex security entrance.',
+    stepNumber: 3,
     icon: Truck,
   },
   delivered: {
+    key: 'delivered',
     label: 'Delivered',
     progress: 100,
-    tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    title: 'Delivered',
-    detail: 'Enjoy your feast. Thank you for ordering with us.',
+    tone: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
+    dotColor: 'bg-emerald-500',
+    title: 'Delivered & Handed Over',
+    detail: 'Order delivered to your gate. Thank you for feasting with us!',
+    stepNumber: 4,
     icon: PackageCheck,
   },
   cancelled: {
+    key: 'cancelled',
     label: 'Cancelled',
     progress: 100,
-    tone: 'bg-red-50 text-red-700 border-red-100',
-    title: 'Order cancelled',
-    detail: 'This order was cancelled. Contact us if this looks wrong.',
+    tone: 'bg-rose-50 text-rose-800 border-rose-200/80',
+    dotColor: 'bg-rose-500',
+    title: 'Order Cancelled',
+    detail: 'This order was cancelled. Contact kitchen support if this looks wrong.',
+    stepNumber: 0,
     icon: XCircle,
   },
 };
 
 export const ORDER_STATUS_FLOW = [
   'placed',
-  'accepted',
   'preparing',
   'out_for_delivery',
   'delivered',
 ];
+
+/**
+ * Extracts order timestamp in milliseconds safely
+ */
+export const getOrderTimestamp = (order) => {
+  const createdAt = order?.created_at || order?.createdAt;
+  if (!createdAt) return Date.now();
+  if (typeof createdAt?.toMillis === 'function') return createdAt.toMillis();
+  if (typeof createdAt?.toDate === 'function') return createdAt.toDate().getTime();
+  const d = new Date(createdAt);
+  return !isNaN(d.getTime()) ? d.getTime() : Date.now();
+};
+
+/**
+ * Computes realistic, time-aware order status
+ * If an order was placed hours ago without a status update, it automatically transitions to Delivered
+ */
+export const getComputedOrderStatus = (order) => {
+  const rawStatus = String(order?.status || '').toLowerCase().trim();
+  const orderTimeMs = getOrderTimestamp(order);
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - orderTimeMs) / (1000 * 60)));
+  const delayMinutes = Number(order?.delay_minutes || order?.extra_prep_time || 0);
+  const delayReason = order?.delay_reason || null;
+  const isDelayed = delayMinutes > 0;
+
+  // If explicitly cancelled
+  if (rawStatus === 'cancelled') {
+    return {
+      statusKey: 'cancelled',
+      meta: ORDER_STATUS.cancelled,
+      isOngoing: false,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+    };
+  }
+
+  // If explicitly marked delivered
+  if (rawStatus === 'delivered') {
+    return {
+      statusKey: 'delivered',
+      meta: ORDER_STATUS.delivered,
+      isOngoing: false,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+    };
+  }
+
+  // Delivery timeout factoring in any admin peak delay
+  const maxPrepDeliveryMinutes = 45 + delayMinutes;
+
+  // If explicitly marked out for delivery
+  if (rawStatus === 'out_for_delivery') {
+    if (elapsedMinutes > maxPrepDeliveryMinutes + 20) {
+      return {
+        statusKey: 'delivered',
+        meta: ORDER_STATUS.delivered,
+        isOngoing: false,
+        elapsedMinutes,
+        delayMinutes,
+        delayReason,
+        isDelayed,
+      };
+    }
+    return {
+      statusKey: 'out_for_delivery',
+      meta: ORDER_STATUS.out_for_delivery,
+      isOngoing: true,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+      etaMinutes: Math.max(3, 10 + delayMinutes - Math.max(0, elapsedMinutes - 20)),
+    };
+  }
+
+  // If explicitly marked preparing
+  if (rawStatus === 'preparing') {
+    if (elapsedMinutes > maxPrepDeliveryMinutes + 20) {
+      return {
+        statusKey: 'delivered',
+        meta: ORDER_STATUS.delivered,
+        isOngoing: false,
+        elapsedMinutes,
+        delayMinutes,
+        delayReason,
+        isDelayed,
+      };
+    }
+    if (elapsedMinutes > (25 + delayMinutes)) {
+      return {
+        statusKey: 'out_for_delivery',
+        meta: ORDER_STATUS.out_for_delivery,
+        isOngoing: true,
+        elapsedMinutes,
+        delayMinutes,
+        delayReason,
+        isDelayed,
+        etaMinutes: Math.max(5, (35 + delayMinutes) - elapsedMinutes),
+      };
+    }
+    return {
+      statusKey: 'preparing',
+      meta: ORDER_STATUS.preparing,
+      isOngoing: true,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+      etaMinutes: Math.max(8, (30 + delayMinutes) - elapsedMinutes),
+    };
+  }
+
+  // Default flow for 'placed' or 'pending' or unspecified:
+  if (elapsedMinutes > maxPrepDeliveryMinutes) {
+    return {
+      statusKey: 'delivered',
+      meta: ORDER_STATUS.delivered,
+      isOngoing: false,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+    };
+  }
+
+  if (elapsedMinutes > (22 + Math.floor(delayMinutes / 2))) {
+    return {
+      statusKey: 'out_for_delivery',
+      meta: ORDER_STATUS.out_for_delivery,
+      isOngoing: true,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+      etaMinutes: Math.max(5, (32 + delayMinutes) - elapsedMinutes),
+    };
+  }
+
+  if (elapsedMinutes > 5) {
+    return {
+      statusKey: 'preparing',
+      meta: ORDER_STATUS.preparing,
+      isOngoing: true,
+      elapsedMinutes,
+      delayMinutes,
+      delayReason,
+      isDelayed,
+      etaMinutes: Math.max(10, (30 + delayMinutes) - elapsedMinutes),
+    };
+  }
+
+  // Brand new order (under 5 minutes)
+  return {
+    statusKey: 'placed',
+    meta: ORDER_STATUS.placed,
+    isOngoing: true,
+    elapsedMinutes,
+    delayMinutes,
+    delayReason,
+    isDelayed,
+    etaMinutes: 30 + delayMinutes,
+  };
+};
 
 export const normalizeOrderStatus = (status) => {
   const cleanStatus = String(status || 'placed').toLowerCase();
@@ -90,3 +255,38 @@ export const getOrderCustomer = (order) => {
 };
 
 export const formatOrderId = (id) => `#${String(id || '').slice(-6).toUpperCase()}`;
+
+export const formatOrderDate = (createdAt) => {
+  if (!createdAt) return 'Recent Order';
+  try {
+    let d;
+    if (typeof createdAt?.toDate === 'function') {
+      d = createdAt.toDate();
+    } else if (typeof createdAt?.toMillis === 'function') {
+      d = new Date(createdAt.toMillis());
+    } else {
+      d = new Date(createdAt);
+    }
+
+    if (isNaN(d.getTime())) return 'Recent Order';
+
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    
+    if (isToday) {
+      return `Today, ${timeStr}`;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) {
+      return `Yesterday, ${timeStr}`;
+    }
+
+    return `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${timeStr}`;
+  } catch {
+    return 'Recent Order';
+  }
+};

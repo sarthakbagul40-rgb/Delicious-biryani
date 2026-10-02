@@ -5,8 +5,37 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   body {
-    @apply font-sans bg-white text-gray-900;
+    @apply font-sans bg-[#F2F4F7] text-gray-900;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  /* 4K and Ultra-wide Display scaling (Auto-scales typography for large monitors) */
+  @media (min-width: 2560px) {
+    html {
+      font-size: 18px;
+    }
+  }
+
+  @media (min-width: 3840px) {
+    html {
+      font-size: 20px;
+    }
+  }
+
+  /* Optimize images for low-bandwidth connections */
+  img {
+    content-visibility: auto;
   }
 }
 
@@ -34,6 +63,12 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Content visibility for low-spec devices and 60fps scrolling */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 300px;
+  }
 }
 
 :root {
@@ -41,4 +76,3 @@
   --saffron-dark: #b58900;
   --clay: #ba4a00;
 }
-
