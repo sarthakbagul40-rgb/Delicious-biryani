@@ -21,3 +21,6 @@ Thumbs.db
 *.cjs
 *.txt
 cloudflared.exe
+
+.vercel
+.env*
